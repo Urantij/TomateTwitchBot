@@ -8,6 +8,38 @@ public class Program
 {
     public static void Main(string[] args)
     {
+        AppDomain.CurrentDomain.UnhandledException += (sender, eventArgs) =>
+        {
+            Console.WriteLine(
+                $"AppDomain.CurrentDomain.UnhandledException {sender?.GetType().Name} ({eventArgs.IsTerminating})");
+
+            if (eventArgs.ExceptionObject is AggregateException aggregateException)
+            {
+                Console.WriteLine("AggregateException!!!");
+                foreach (Exception innerException in aggregateException.Flatten().InnerExceptions)
+                {
+                    Console.WriteLine("Exception!!!");
+                    Console.WriteLine(innerException);
+                }
+            }
+            else
+            {
+                Console.WriteLine("Exception!!!");
+                Console.WriteLine(eventArgs.ExceptionObject);
+            }
+        };
+
+        TaskScheduler.UnobservedTaskException += (sender, eventArgs) =>
+        {
+            Console.WriteLine(
+                $"TaskScheduler.UnobservedTaskException {sender?.GetType().Name} ({eventArgs.Observed})");
+            foreach (Exception innerException in eventArgs.Exception.Flatten().InnerExceptions)
+            {
+                Console.WriteLine("Exception!!!");
+                Console.WriteLine(innerException);
+            }
+        };
+
         var builder = Host.CreateApplicationBuilder(args);
 
         builder.Logging.ClearProviders();
@@ -40,7 +72,7 @@ public class Program
 
         builder.Services.AddSingleton<Worker>();
         builder.Services.AddHostedService<Worker>(c => c.GetRequiredService<Worker>());
-        
+
         var host = builder.Build();
 
         using (IServiceScope scope = host.Services.CreateScope())
@@ -48,6 +80,7 @@ public class Program
             using var context = scope.ServiceProvider.GetRequiredService<MyContext>();
             context.Database.Migrate();
         }
+
         host.Run();
     }
 }
